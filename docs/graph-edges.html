@@ -726,6 +726,18 @@ Query → embedding retrieval → "negative decision loss" (cosine = 0.62)
 </div>
 
 <script>
+// === HI-DPI CANVAS SCALING ===
+function hiDPI(canvas, w, h) {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  return ctx;
+}
+
 // === GRAPH VISUALIZATION ===
 const nodes = [
   {id:"basin key", x:180, y:120, desc:"Early inputs shape trajectory"},
@@ -770,7 +782,7 @@ let showCurated=true, showComputed=true, showBoth=false;
 let hoveredNode=null, dragNode=null, lastMouse=null;
 
 const canvas = document.getElementById('graphCanvas');
-const ctx = canvas.getContext('2d');
+const ctx = hiDPI(canvas, 760, 480);
 const W=760, H=480;
 
 function getNode(id){ return nodes.find(n=>n.id===id); }
@@ -933,8 +945,8 @@ draw();
 (function(){
   const c = document.getElementById('collapseCanvas');
   if(!c) return;
-  const ctx = c.getContext('2d');
   const W=760, H=220;
+  const ctx = hiDPI(c, W, H);
 
   // Draw dimension bars (left side)
   ctx.fillStyle='#f7f8fa'; ctx.fillRect(0,0,W,H);
@@ -985,8 +997,8 @@ draw();
 (function(){
   const c = document.getElementById('heatmapCanvas');
   if(!c) return;
-  const ctx = c.getContext('2d');
   const W=760, H=300;
+  const ctx = hiDPI(c, W, H);
   ctx.fillStyle='#f7f8fa'; ctx.fillRect(0,0,W,H);
 
   function drawHeatmap(startX, startY, label, pattern, sublabel){
@@ -1068,8 +1080,8 @@ draw();
 (function(){
   const c = document.getElementById('gradientCanvas');
   if(!c) return;
-  const ctx = c.getContext('2d');
   const W=760, H=280;
+  const ctx = hiDPI(c, W, H);
   ctx.fillStyle='#f7f8fa'; ctx.fillRect(0,0,W,H);
 
   // Left: elaboration (same subspace)
@@ -1133,6 +1145,8 @@ draw();
 })();
 
 // === QUERY-AS-PROBE ANIMATION ===
+const probeCanvasEl = document.getElementById('probeCanvas');
+const probeCtx = probeCanvasEl ? hiDPI(probeCanvasEl, 760, 420) : null;
 let probeStage = 0;
 let probeAnim = null;
 
@@ -1162,9 +1176,8 @@ function animateProbe(){
 }
 
 function drawProbe(){
-  const c = document.getElementById('probeCanvas');
-  if(!c) return;
-  const ctx = c.getContext('2d');
+  if(!probeCtx) return;
+  const ctx = probeCtx;
   const W=760, H=420;
   ctx.fillStyle='#f7f8fa'; ctx.fillRect(0,0,W,H);
 
@@ -1308,8 +1321,8 @@ drawProbe();
 (function(){
   const c = document.getElementById('layersCanvas');
   if(!c) return;
-  const ctx = c.getContext('2d');
   const W=760, H=300;
+  const ctx = hiDPI(c, W, H);
   ctx.fillStyle='#f7f8fa'; ctx.fillRect(0,0,W,H);
 
   const layers = [
@@ -1366,8 +1379,8 @@ drawProbe();
 (function(){
   const c = document.getElementById('usesCanvas');
   if(!c) return;
-  const ctx = c.getContext('2d');
   const W=760, H=360;
+  const ctx = hiDPI(c, W, H);
   ctx.fillStyle='#f7f8fa'; ctx.fillRect(0,0,W,H);
 
   const uses = [
@@ -1419,8 +1432,8 @@ drawProbe();
 (function(){
   const c = document.getElementById('subspaceCanvas');
   if(!c) return;
-  const ctx = c.getContext('2d');
   const W=760, H=280;
+  const ctx = hiDPI(c, W, H);
   ctx.fillStyle='#f7f8fa'; ctx.fillRect(0,0,W,H);
 
   // Left side: full space (all dims)

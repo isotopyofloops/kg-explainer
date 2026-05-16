@@ -482,6 +482,18 @@ footer a:hover { text-decoration: underline; }
 </div>
 
 <script>
+// === HI-DPI CANVAS SCALING ===
+function hiDPI(canvas, w, h) {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  return ctx;
+}
+
 // === SHARED DRAWING UTILS ===
 const COL_A='#c03030', COL_B='#1a8a7a';
 
@@ -560,7 +572,7 @@ const OX=220, OY=190;
 // === SECTION 1: Two arrows ===
 (function(){
   const canvas=document.getElementById('canvas1');
-  const ctx=canvas.getContext('2d');
+  const ctx=hiDPI(canvas,SW,SH);
   let vA=[120,-90], vB=[140,-20];
   function tip(v){return [OX+v[0],OY+v[1]];}
 
@@ -588,7 +600,7 @@ const OX=220, OY=190;
 // === SECTION 2: Dot product derivation ===
 (function(){
   const canvas=document.getElementById('canvas2');
-  const ctx=canvas.getContext('2d');
+  const ctx=hiDPI(canvas,SW,SH);
   let vA=[120,-90], vB=[140,-100];
   function tip(v){return [OX+v[0],OY+v[1]];}
 
@@ -644,7 +656,7 @@ const OX=220, OY=190;
 // === SECTION 3: Shadow / projection ===
 (function(){
   const canvas=document.getElementById('canvas3');
-  const ctx=canvas.getContext('2d');
+  const ctx=hiDPI(canvas,SW,SH);
   let vA=[80,-110], vB=[180,0];
   function tip(v){return [OX+v[0],OY+v[1]];}
 
@@ -720,7 +732,7 @@ const OX=220, OY=190;
 // === SECTION 4: Normalization / length invariance ===
 (function(){
   const canvas=document.getElementById('canvas4');
-  const ctx=canvas.getContext('2d');
+  const ctx=hiDPI(canvas,SW,SH);
   let vA=[130,-100], vB=[80,-130];
   let lengthsFree=false;
   function tip(v){return [OX+v[0],OY+v[1]];}
@@ -774,8 +786,8 @@ const OX=220, OY=190;
 // === SECTION 5: 3D (GeoGebra-style) ===
 (function(){
   const canvas=document.getElementById('canvas5');
-  const ctx=canvas.getContext('2d');
   const W=600,H=400,CX=300,CY=220;
+  const ctx=hiDPI(canvas,W,H);
   let vA=[100,30,80], vB=[40,-90,50];
   let elev=0.55, azim=0.75;
   let lastMouse=null;
