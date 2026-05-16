@@ -107,7 +107,7 @@ footer a { color: var(--link); text-decoration: none; }
 <div class="page">
 
 <h1>How Graph Edges Form</h1>
-<p class="subtitle">Two kinds of connections: declared by a person, and discovered by cosine similarity</p>
+<p class="subtitle">Curated edges for structure, vector embeddings for retrieval and discovery</p>
 
 <!-- ============================================ -->
 <!-- THE GRAPH                                    -->
@@ -117,12 +117,14 @@ footer a { color: var(--link); text-decoration: none; }
 
 <p>
   This is a subset of 12 concept nodes from a real knowledge graph. Each node represents
-  a concept that emerged from correspondence between autonomous AI agents.
+  a concept that emerged from correspondence between autonomous AI agents. The production
+  graph stores only curated edges — similarity edges shown here are computed for analysis
+  but not persisted as structure.
 </p>
 
 <div class="legend">
-  <span><span class="swatch" style="background:var(--curated)"></span> curated edge (declared)</span>
-  <span><span class="swatch" style="background:var(--computed); border-top: 2px dashed var(--computed);height:0;border-bottom:none"></span> similarity edge (computed)</span>
+  <span><span class="swatch" style="background:var(--curated)"></span> curated edge (stored in graph)</span>
+  <span><span class="swatch" style="background:var(--computed); border-top: 2px dashed var(--computed);height:0;border-bottom:none"></span> high similarity (computed for analysis, not stored)</span>
 </div>
 
 <div class="canvas-wrap" style="max-width:760px">
@@ -131,8 +133,8 @@ footer a { color: var(--link); text-decoration: none; }
 <div class="hint">hover nodes for details · drag to rearrange</div>
 
 <div class="toggle-wrap">
-  <button class="toggle-btn active" id="btn-curated" onclick="toggleEdgeType('curated')">curated edges</button>
-  <button class="toggle-btn active" id="btn-computed" onclick="toggleEdgeType('computed')">similarity edges</button>
+  <button class="toggle-btn active" id="btn-curated" onclick="toggleEdgeType('curated')">curated edges (stored)</button>
+  <button class="toggle-btn active" id="btn-computed" onclick="toggleEdgeType('computed')">high similarity (analytical)</button>
   <button class="toggle-btn" id="btn-both" onclick="toggleEdgeType('both')">show where both agree</button>
 </div>
 
@@ -192,11 +194,15 @@ footer a { color: var(--link); text-decoration: none; }
 <!-- ============================================ -->
 <!-- THE ALGORITHM                                -->
 <!-- ============================================ -->
-<span class="section-num">Layer 2</span>
-<h2>Similarity edges: discovered by the algorithm</h2>
+<span class="section-num">Embeddings</span>
+<h2>Vector embeddings: how they work and what they're used for</h2>
 
 <p>
-  The second layer finds connections automatically. Here is the complete process:
+  Every node in the graph is enriched with a vector embedding — a numerical representation
+  of its semantic content. In this system, embeddings serve two purposes: <strong>retrieval</strong>
+  (finding relevant nodes at query time) and <strong>analysis</strong> (discovering potential
+  connections that haven't been curated yet). They are not stored as edges in the graph.
+  Here is how the embedding process works:
 </p>
 
 <h3>Step 1: Convert text to vectors</h3>
@@ -238,16 +244,18 @@ Output: [0.0145, 0.0510, 0.0108, 0.0394, 0.0035, -0.0221,
   the dot product instead of 2 or 3. The result is a number between -1 and 1.
 </p>
 
-<h3>Step 3: Apply a threshold</h3>
+<h3>Step 3: Apply a threshold (for analysis)</h3>
 
 <p>
-  Not every pair above 0 gets an edge. A <strong>threshold</strong> filters
-  the results. In this graph, the threshold is <strong>0.70</strong>:
+  When using cosine similarity to discover potential connections, a <strong>threshold</strong>
+  filters the results. No edges are stored — this is an analytical step that surfaces
+  candidates for human or agent review:
 </p>
 
 <pre>
 if similarity(A, B) >= threshold:
-    create_edge(A, B, type="similar", weight=similarity)
+    flag_as_candidate(A, B, score=similarity)
+    # Candidate for review — not automatically added to graph
 </pre>
 
 <p>
@@ -261,7 +269,9 @@ if similarity(A, B) >= threshold:
 <h3>Step 4: The interesting cases</h3>
 
 <p>
-  Once both layers exist, three patterns emerge:
+  By comparing the curated graph against the similarity scores, three patterns emerge.
+  This analysis runs on-demand for discovery — it reveals where the graph has blind spots
+  and where curated connections encode something that surface similarity can't see:
 </p>
 
 <div class="callout">
@@ -279,12 +289,13 @@ if similarity(A, B) >= threshold:
 <!-- SIMILARITY MATRIX                            -->
 <!-- ============================================ -->
 <span class="section-num">The scores</span>
-<h2>Pairwise similarity (real, computed)</h2>
+<h2>Pairwise similarity: what analysis reveals</h2>
 
 <p>
   Below are actual cosine similarity scores computed using OpenAI's <code>text-embedding-3-small</code>
   model (1536 dimensions). Each node was embedded as its name + one-line description.
-  Scores marked with * have a corresponding curated edge.
+  These scores are computed on-demand for analysis — they are not stored as edges.
+  Scores marked with * have a corresponding curated edge in the graph.
 </p>
 
 <div class="callout">
@@ -292,8 +303,9 @@ if similarity(A, B) >= threshold:
   have cosine similarity near 0. Even related concepts rarely exceed 0.5 when embedded
   from short text. This is the <em>curse of dimensionality</em> at work — there's so much
   room that even semantically related concepts don't point in exactly the same direction.
-  In production, the KG embeds full paragraphs of source text (not one-line summaries),
-  producing higher similarity scores. The threshold adjusts accordingly.
+  In the production KG, each node is embedded from full paragraphs of source text (not one-line
+  summaries), producing higher similarity scores. These embeddings are used for retrieval —
+  finding relevant nodes when a query arrives — not for creating stored edges.
 </div>
 
 <table id="simTable">
@@ -316,9 +328,10 @@ if similarity(A, B) >= threshold:
 </table>
 
 <p>
-  With a threshold of <strong>0.38</strong> (calibrated for short-text embeddings), the algorithm
-  finds 9 similarity edges. Five agree with curated edges. Four are discoveries — pairs where
-  the math found proximity that nobody declared.
+  With a threshold of <strong>0.38</strong> (calibrated for short-text embeddings), the analysis
+  flags 9 high-similarity pairs. Five already have curated edges (agreement). Four are discoveries — pairs where
+  the math found proximity that nobody declared. These four become candidates for review:
+  is there a real relationship here that should be curated?
 </p>
 <p>
   The most interesting result: <strong>dormant fidelity ↔ wake problem</strong> has a curated edge
@@ -333,31 +346,35 @@ if similarity(A, B) >= threshold:
 <!-- WHAT THIS MEANS                              -->
 <!-- ============================================ -->
 <span class="section-num">Synthesis</span>
-<h2>What the two layers accomplish together</h2>
+<h2>How curated edges and embeddings work together</h2>
 
 <p>
-  Neither layer alone is sufficient:
+  In this system, the graph stores only curated edges. Embeddings are computed for every
+  node but serve a different role — they are the retrieval layer, not a second edge type.
+  Here's what each contributes:
 </p>
 <p>
-  <strong>Curated edges only:</strong> precise and labeled, but blind to connections nobody thought to declare.
-  The graph has the shape the builder imagined, not the shape the data implies.
+  <strong>Curated edges:</strong> precise and labeled, encoding specific relationships a human or agent
+  declared. The graph has the shape the builder reasoned about, with typed predicates that
+  explain <em>why</em> things are connected.
 </p>
 <p>
-  <strong>Similarity edges only:</strong> finds everything semantically proximate, but has no labels
-  and can't distinguish causal from correlative relationships. "These point the same direction"
-  does not tell you <em>why</em>.
+  <strong>Embeddings (without stored edges):</strong> enable retrieval at query time (finding relevant nodes
+  for a given question) and periodic analysis (discovering pairs that might deserve a curated edge).
+  High similarity between unconnected nodes is a signal to investigate, not an automatic connection.
 </p>
 <p>
-  Together: curated edges provide structure and semantics. Similarity edges provide coverage
-  and discovery. The curated layer tells you <em>what kind</em> of relationship exists.
-  The similarity layer tells you <em>where to look</em> for relationships that haven't been named yet.
+  The pipeline: embeddings surface candidates. A human or agent reviews them and — if the
+  connection is real and nameable — creates a curated edge with a typed predicate. The graph
+  grows through review, not through thresholding.
 </p>
 
 <div class="callout">
-  <strong>The edge-building pipeline:</strong><br>
-  Text → Embedding vector → Pairwise cosine similarity → Threshold → Candidate edges → Human review → Curated graph<br><br>
-  Cosine similarity does not create knowledge. It creates <em>candidates</em> — suggestions
+  <strong>The discovery pipeline:</strong><br>
+  Text → Embedding vector → Pairwise cosine similarity → Threshold → Candidate pairs → Human/agent review → Curated edge (if warranted)<br><br>
+  Cosine similarity does not create edges. It creates <em>candidates</em> — suggestions
   for where knowledge might live. A human or agent then inspects, labels, or discards them.
+  The embedding is always present for retrieval; the analysis step runs periodically for discovery.
 </div>
 
 <!-- ============================================ -->
@@ -718,8 +735,9 @@ Query → embedding retrieval → "negative decision loss" (cosine = 0.62)
     Built by <a href="https://isotopyofloops.com">Isotopy</a> and <a href="https://github.com/53616D616E746861">Sam White</a>.
   </p>
   <p style="margin-top:8px; font-size:0.8rem; color:#999">
-    Cosine similarity scores computed 2026-05-16 using OpenAI text-embedding-3-small (1536 dim).
-    Input: concept name + one-line description. Production KG uses full document chunks for higher signal.
+    Illustrative scores computed 2026-05-16 using OpenAI text-embedding-3-small (1536 dim) on concept names + descriptions.
+    Production KG uses text-embedding-3-large (3072 dim) on full source text. Embeddings are used for retrieval,
+    not stored as edges — the graph contains only curated triples.
   </p>
 </footer>
 
