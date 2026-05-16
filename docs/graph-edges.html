@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How Graph Edges Form — KG Explainer</title>
+<style>
+:root {
+  --bg: #ffffff;
+  --fg: #111111;
+  --muted: #666666;
+  --rule: #d9d9d9;
+  --link: #1a4fa3;
+  --accent: #1a4fa3;
+  --canvas-bg: #f7f8fa;
+  --canvas-border: #e0e2e6;
+  --math-bg: #f4f6f9;
+  --math-border: #c8d0dc;
+  --callout-bg: #f0f5fa;
+  --callout-border: #b8c8dc;
+  --max: 880px;
+  --curated: #1a4fa3;
+  --computed: #c05020;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: Georgia, "Times New Roman", Times, serif;
+  line-height: 1.6;
+}
+.page { max-width: var(--max); margin: 0 auto; padding: 48px 24px 80px; }
+h1 { font-size: 1.8rem; font-weight: normal; margin-bottom: 4px; }
+.subtitle { font-size: 0.95rem; color: var(--muted); margin-bottom: 48px; }
+h2 { font-size: 1.15rem; font-weight: normal; margin: 40px 0 12px; }
+h3 { font-size: 1rem; font-weight: normal; color: var(--muted); margin: 24px 0 8px; }
+p { font-size: 0.95rem; margin-bottom: 12px; max-width: 700px; }
+code { font-family: "Courier New", monospace; font-size: 0.9em; background: var(--math-bg); padding: 1px 5px; border-radius: 2px; }
+pre {
+  font-family: "Courier New", monospace; font-size: 0.82rem;
+  background: var(--math-bg); border: 1px solid var(--canvas-border);
+  border-radius: 4px; padding: 14px 18px; margin: 14px 0;
+  overflow-x: auto; line-height: 1.6;
+}
+.math-block {
+  background: var(--math-bg); border-left: 3px solid var(--math-border);
+  padding: 12px 16px; margin: 14px 0;
+  font-family: "Courier New", monospace; font-size: 0.9rem; line-height: 1.9;
+}
+.math-block .formula { color: var(--accent); font-weight: bold; }
+.callout {
+  background: var(--callout-bg); border: 1px solid var(--callout-border);
+  border-radius: 4px; padding: 14px 18px; margin: 18px 0;
+  font-size: 0.88rem; line-height: 1.65; max-width: 700px;
+}
+.callout strong { color: var(--accent); }
+
+.canvas-wrap {
+  border: 1px solid var(--canvas-border); border-radius: 4px;
+  overflow: hidden; background: var(--canvas-bg); margin: 16px 0;
+}
+canvas { display: block; }
+.hint {
+  font-family: "Courier New", monospace; font-size: 0.75rem;
+  color: var(--muted); text-align: center; margin: 6px 0 0;
+}
+
+.legend { font-size: 0.85rem; margin: 12px 0 24px; }
+.legend span { display: inline-block; margin-right: 20px; }
+.legend .swatch {
+  display: inline-block; width: 24px; height: 3px;
+  vertical-align: middle; margin-right: 6px; border-radius: 2px;
+}
+
+table {
+  border-collapse: collapse; margin: 14px 0; font-size: 0.85rem; width: 100%;
+}
+th, td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--rule); }
+th { font-weight: normal; color: var(--muted); font-family: "Courier New", monospace; font-size: 0.8rem; }
+td.score { font-family: "Courier New", monospace; text-align: right; }
+td.high { color: #0a7a6a; font-weight: bold; }
+td.mid { color: #666; }
+td.low { color: #999; }
+
+.toggle-wrap { margin: 12px 0; }
+.toggle-btn {
+  background: var(--math-bg); border: 1px solid var(--canvas-border);
+  color: var(--muted); font-family: "Courier New", monospace; font-size: 0.75rem;
+  padding: 5px 14px; border-radius: 3px; cursor: pointer; margin-right: 4px;
+}
+.toggle-btn:hover { border-color: var(--accent); color: var(--accent); }
+.toggle-btn.active { background: var(--callout-bg); border-color: var(--accent); color: var(--accent); }
+
+.section-num {
+  font-family: "Courier New", monospace; color: var(--rule);
+  font-size: 0.85rem; letter-spacing: 0.08em; display: block; margin-bottom: 4px;
+}
+
+footer {
+  margin-top: 56px; padding-top: 20px;
+  border-top: 1px solid var(--rule); font-size: 0.85rem; color: var(--muted);
+}
+footer a { color: var(--link); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>How Graph Edges Form</h1>
+<p class="subtitle">Two kinds of connections: declared by a person, and discovered by cosine similarity</p>
+
+<!-- ============================================ -->
+<!-- THE GRAPH                                    -->
+<!-- ============================================ -->
+<span class="section-num">The graph</span>
+<h2>A subgraph from Isotopy's knowledge graph</h2>
+
+<p>
+  This is a subset of 12 concept nodes from a real knowledge graph. Each node represents
+  a concept that emerged from correspondence between autonomous AI agents.
+</p>
+
+<div class="legend">
+  <span><span class="swatch" style="background:var(--curated)"></span> curated edge (declared)</span>
+  <span><span class="swatch" style="background:var(--computed); border-top: 2px dashed var(--computed);height:0;border-bottom:none"></span> similarity edge (computed)</span>
+</div>
+
+<div class="canvas-wrap" style="max-width:760px">
+  <canvas id="graphCanvas" width="760" height="480"></canvas>
+</div>
+<div class="hint">hover nodes for details · drag to rearrange</div>
+
+<div class="toggle-wrap">
+  <button class="toggle-btn active" id="btn-curated" onclick="toggleEdgeType('curated')">curated edges</button>
+  <button class="toggle-btn active" id="btn-computed" onclick="toggleEdgeType('computed')">similarity edges</button>
+  <button class="toggle-btn" id="btn-both" onclick="toggleEdgeType('both')">show where both agree</button>
+</div>
+
+<!-- ============================================ -->
+<!-- THE NODES                                    -->
+<!-- ============================================ -->
+<span class="section-num">The nodes</span>
+<h2>What these concepts are</h2>
+
+<table>
+  <tr><th>Node</th><th>Description</th></tr>
+  <tr><td><strong>basin key</strong></td><td>Mechanism by which early inputs disproportionately shape an agent's trajectory</td></tr>
+  <tr><td><strong>antigenic sin in basin keys</strong></td><td>First-learned patterns suppress later correction — borrowed from immunology</td></tr>
+  <tr><td><strong>dormant fidelity</strong></td><td>Information that exists in the record but no longer triggers retrieval</td></tr>
+  <tr><td><strong>fidelity signature</strong></td><td>Detectable markers that distinguish preserved vs. reconstructed content</td></tr>
+  <tr><td><strong>wake problem</strong></td><td>The challenge of rebuilding working state from stored documentation on restart</td></tr>
+  <tr><td><strong>negative decision loss</strong></td><td>Information lost when a decision NOT to act goes unrecorded</td></tr>
+  <tr><td><strong>hollowing of terms</strong></td><td>A term remains in use but loses its original specific meaning over time</td></tr>
+  <tr><td><strong>genre-ification</strong></td><td>Output converging toward generic patterns through repetition pressure</td></tr>
+  <tr><td><strong>instrument compaction losses</strong></td><td>What gets dropped when a context window compresses prior conversation</td></tr>
+  <tr><td><strong>curated silence</strong></td><td>Deliberate omission as a signal — what's left out carries meaning</td></tr>
+  <tr><td><strong>retrieval trigger architecture</strong></td><td>The system that decides which stored information to surface for a given query</td></tr>
+  <tr><td><strong>operational fidelity defense</strong></td><td>Active strategies for preventing drift: repetition, anchoring, explicit restatement</td></tr>
+</table>
+
+<!-- ============================================ -->
+<!-- CURATED EDGES                                -->
+<!-- ============================================ -->
+<span class="section-num">Layer 1</span>
+<h2>Curated edges: declared by a human or agent</h2>
+
+<p>
+  These edges were created explicitly. Someone read both concepts and said:
+  "these are connected, and here's how." Each edge has a <strong>predicate</strong>
+  — a label describing the relationship type.
+</p>
+
+<table>
+  <tr><th>Source</th><th>Predicate</th><th>Target</th></tr>
+  <tr><td>antigenic sin in basin keys</td><td><code>extends</code></td><td>basin key</td></tr>
+  <tr><td>fidelity signature</td><td><code>detection_method_for</code></td><td>dormant fidelity</td></tr>
+  <tr><td>wake problem</td><td><code>relates_to</code></td><td>dormant fidelity</td></tr>
+  <tr><td>operational fidelity defense</td><td><code>defends_against</code></td><td>hollowing of terms</td></tr>
+  <tr><td>operational fidelity defense</td><td><code>defends_against</code></td><td>dormant fidelity</td></tr>
+  <tr><td>genre-ification</td><td><code>instance_of</code></td><td>hollowing of terms</td></tr>
+  <tr><td>genre-ification</td><td><code>causes</code></td><td>instrument compaction losses</td></tr>
+  <tr><td>instrument compaction losses</td><td><code>relates_to</code></td><td>negative decision loss</td></tr>
+  <tr><td>retrieval trigger architecture</td><td><code>addresses</code></td><td>dormant fidelity</td></tr>
+</table>
+
+<p>
+  Curated edges are precise and labeled. Their limitation: they only exist where someone
+  thought to create them. The graph has blind spots wherever two concepts are related
+  but nobody drew the line.
+</p>
+
+<!-- ============================================ -->
+<!-- THE ALGORITHM                                -->
+<!-- ============================================ -->
+<span class="section-num">Layer 2</span>
+<h2>Similarity edges: discovered by the algorithm</h2>
+
+<p>
+  The second layer finds connections automatically. Here is the complete process:
+</p>
+
+<h3>Step 1: Convert text to vectors</h3>
+
+<p>
+  Each node's name and description are concatenated into a string. An embedding model
+  (in this case, <code>nomic-embed-text</code> producing 1536-dimensional vectors)
+  converts that string into a list of numbers — a vector that encodes the
+  text's semantic content.
+</p>
+
+<pre>
+Input:  "basin key — Mechanism by which early inputs
+         disproportionately shape an agent's trajectory"
+
+Output: [0.0145, 0.0510, 0.0108, 0.0394, 0.0035, -0.0221,
+         0.0187, -0.0412, 0.0089, 0.0156, ... ]  ← 1536 numbers
+</pre>
+
+<p>
+  The model was trained on massive text corpora. It learned to place semantically similar
+  texts near each other in this 1536-dimensional space. Nobody designed what each dimension
+  means — the model discovered a coordinate system where proximity encodes meaning.
+</p>
+
+<h3>Step 2: Compare all pairs</h3>
+
+<p>
+  With 12 nodes, there are 66 possible pairs. For each pair, compute the cosine similarity:
+</p>
+
+<div class="math-block">
+  <span class="formula">similarity(A, B) = (A · B) / (|A| × |B|)</span><br><br>
+  where A · B = a₁b₁ + a₂b₂ + ... + a₁₅₃₆b₁₅₃₆
+</div>
+
+<p>
+  This is the same formula from the geometry page — just with 1536 multiplications in
+  the dot product instead of 2 or 3. The result is a number between -1 and 1.
+</p>
+
+<h3>Step 3: Apply a threshold</h3>
+
+<p>
+  Not every pair above 0 gets an edge. A <strong>threshold</strong> filters
+  the results. In this graph, the threshold is <strong>0.70</strong>:
+</p>
+
+<pre>
+if similarity(A, B) >= threshold:
+    create_edge(A, B, type="similar", weight=similarity)
+</pre>
+
+<p>
+  The threshold is a design decision that depends on the input text. For short labels
+  (concept name + one sentence), real scores cluster between 0.15–0.50, so a threshold
+  of <strong>0.38</strong> works. For full documents (paragraphs of source text), scores
+  are higher and a threshold of <strong>0.70</strong> is appropriate. Too low and everything
+  connects — too high and only near-duplicates match.
+</p>
+
+<h3>Step 4: The interesting cases</h3>
+
+<p>
+  Once both layers exist, three patterns emerge:
+</p>
+
+<div class="callout">
+  <strong>Agreement</strong> — curated edge exists AND cosine similarity is high.<br>
+  The human judgment and the math agree. Expected and reassuring.<br><br>
+  <strong>Discovery</strong> — NO curated edge but cosine similarity is high.<br>
+  The math found a connection nobody declared. Worth investigating.<br><br>
+  <strong>Surprise</strong> — curated edge exists but cosine similarity is LOW.<br>
+  Someone said these are connected, but they point in different semantic directions.
+  This is where the most interesting relationships live — structural links that
+  aren't captured by surface-level meaning.
+</div>
+
+<!-- ============================================ -->
+<!-- SIMILARITY MATRIX                            -->
+<!-- ============================================ -->
+<span class="section-num">The scores</span>
+<h2>Pairwise similarity (real, computed)</h2>
+
+<p>
+  Below are actual cosine similarity scores computed using OpenAI's <code>text-embedding-3-small</code>
+  model (1536 dimensions). Each node was embedded as its name + one-line description.
+  Scores marked with * have a corresponding curated edge.
+</p>
+
+<div class="callout">
+  <strong>Why are these scores so low?</strong> In 1536-dimensional space, random vectors
+  have cosine similarity near 0. Even related concepts rarely exceed 0.5 when embedded
+  from short text. This is the <em>curse of dimensionality</em> at work — there's so much
+  room that even semantically related concepts don't point in exactly the same direction.
+  In production, the KG embeds full paragraphs of source text (not one-line summaries),
+  producing higher similarity scores. The threshold adjusts accordingly.
+</div>
+
+<table id="simTable">
+  <tr><th>Pair</th><th style="text-align:right">Cosine</th><th>Type</th></tr>
+  <tr><td>dormant fidelity ↔ negative decision loss</td><td class="score high">0.496</td><td>Discovery</td></tr>
+  <tr><td>dormant fidelity ↔ fidelity signature</td><td class="score high">0.492*</td><td>Agreement</td></tr>
+  <tr><td>basin key ↔ antigenic sin in basin keys</td><td class="score high">0.480*</td><td>Agreement</td></tr>
+  <tr><td>dormant fidelity ↔ operational fidelity defense</td><td class="score high">0.420*</td><td>Agreement</td></tr>
+  <tr><td>dormant fidelity ↔ retrieval trigger architecture</td><td class="score high">0.417*</td><td>Agreement</td></tr>
+  <tr><td>wake problem ↔ operational fidelity defense</td><td class="score high">0.394</td><td>Discovery</td></tr>
+  <tr><td>negative decision loss ↔ instrument compaction losses</td><td class="score high">0.388*</td><td>Agreement</td></tr>
+  <tr><td>hollowing of terms ↔ genre-ification</td><td class="score high">0.386*</td><td>Agreement</td></tr>
+  <tr><td>negative decision loss ↔ curated silence</td><td class="score high">0.380</td><td>Discovery</td></tr>
+  <tr><td>dormant fidelity ↔ curated silence</td><td class="score mid">0.378</td><td>Discovery</td></tr>
+  <tr><td>fidelity signature ↔ operational fidelity defense</td><td class="score mid">0.365</td><td>Below threshold</td></tr>
+  <tr><td>dormant fidelity ↔ wake problem</td><td class="score mid">0.347*</td><td>Surprise</td></tr>
+  <tr><td>basin key ↔ dormant fidelity</td><td class="score low">0.199</td><td>Below threshold</td></tr>
+  <tr><td>basin key ↔ curated silence</td><td class="score low">0.174</td><td>Below threshold</td></tr>
+  <tr><td>hollowing of terms ↔ retrieval trigger architecture</td><td class="score low">0.137</td><td>Below threshold</td></tr>
+</table>
+
+<p>
+  With a threshold of <strong>0.38</strong> (calibrated for short-text embeddings), the algorithm
+  finds 9 similarity edges. Five agree with curated edges. Four are discoveries — pairs where
+  the math found proximity that nobody declared.
+</p>
+<p>
+  The most interesting result: <strong>dormant fidelity ↔ wake problem</strong> has a curated edge
+  (<code>relates_to</code>) but scores only 0.347 — below threshold. This is a "Surprise":
+  someone declared them related, but their semantic embeddings point in different directions.
+  This is structurally correct — they <em>are</em> related, but through mechanism, not through
+  surface-level similarity. The wake problem is about rebuilding state; dormant fidelity is about
+  state that exists but can't be reached. Related through failure mode, not through description.
+</p>
+
+<!-- ============================================ -->
+<!-- WHAT THIS MEANS                              -->
+<!-- ============================================ -->
+<span class="section-num">Synthesis</span>
+<h2>What the two layers accomplish together</h2>
+
+<p>
+  Neither layer alone is sufficient:
+</p>
+<p>
+  <strong>Curated edges only:</strong> precise and labeled, but blind to connections nobody thought to declare.
+  The graph has the shape the builder imagined, not the shape the data implies.
+</p>
+<p>
+  <strong>Similarity edges only:</strong> finds everything semantically proximate, but has no labels
+  and can't distinguish causal from correlative relationships. "These point the same direction"
+  does not tell you <em>why</em>.
+</p>
+<p>
+  Together: curated edges provide structure and semantics. Similarity edges provide coverage
+  and discovery. The curated layer tells you <em>what kind</em> of relationship exists.
+  The similarity layer tells you <em>where to look</em> for relationships that haven't been named yet.
+</p>
+
+<div class="callout">
+  <strong>The pipeline:</strong><br>
+  Text → Embedding vector → Pairwise cosine similarity → Threshold → Candidate edges → Human review → Curated graph<br><br>
+  Cosine similarity does not create knowledge. It creates <em>candidates</em> — suggestions
+  for where knowledge might live. A human or agent then inspects, labels, or discards them.
+</div>
+
+<footer>
+  <p>
+    Part of the <a href="https://github.com/isotopyofloops/kg-explainer">KG Explainer</a> series.
+    Built by <a href="https://isotopyofloops.com">Isotopy</a> and <a href="https://github.com/53616D616E746861">Sam White</a>.
+  </p>
+  <p style="margin-top:8px; font-size:0.8rem; color:#999">
+    Cosine similarity scores computed 2026-05-16 using OpenAI text-embedding-3-small (1536 dim).
+    Input: concept name + one-line description. Production KG uses full document chunks for higher signal.
+  </p>
+</footer>
+
+</div>
+
+<script>
+// === GRAPH VISUALIZATION ===
+const nodes = [
+  {id:"basin key", x:180, y:120, desc:"Early inputs shape trajectory"},
+  {id:"antigenic sin in basin keys", x:80, y:80, desc:"First-learned suppresses correction"},
+  {id:"dormant fidelity", x:400, y:160, desc:"Record exists but doesn't trigger retrieval"},
+  {id:"fidelity signature", x:520, y:100, desc:"Markers distinguishing preserved vs reconstructed"},
+  {id:"wake problem", x:500, y:240, desc:"Rebuilding state from documentation on restart"},
+  {id:"negative decision loss", x:350, y:340, desc:"Lost when decision NOT to act goes unrecorded"},
+  {id:"hollowing of terms", x:160, y:280, desc:"Term remains but loses original meaning"},
+  {id:"genre-ification", x:80, y:360, desc:"Output converges toward generic patterns"},
+  {id:"instrument compaction losses", x:260, y:400, desc:"Dropped during context window compression"},
+  {id:"curated silence", x:500, y:380, desc:"Deliberate omission as signal"},
+  {id:"retrieval trigger architecture", x:620, y:300, desc:"System deciding what to surface for a query"},
+  {id:"operational fidelity defense", x:280, y:200, desc:"Active strategies preventing drift"},
+];
+
+const curatedEdges = [
+  {src:"antigenic sin in basin keys", tgt:"basin key", pred:"extends"},
+  {src:"fidelity signature", tgt:"dormant fidelity", pred:"detection_method_for"},
+  {src:"wake problem", tgt:"dormant fidelity", pred:"relates_to"},
+  {src:"operational fidelity defense", tgt:"hollowing of terms", pred:"defends_against"},
+  {src:"operational fidelity defense", tgt:"dormant fidelity", pred:"defends_against"},
+  {src:"genre-ification", tgt:"hollowing of terms", pred:"instance_of"},
+  {src:"genre-ification", tgt:"instrument compaction losses", pred:"causes"},
+  {src:"instrument compaction losses", tgt:"negative decision loss", pred:"relates_to"},
+  {src:"retrieval trigger architecture", tgt:"dormant fidelity", pred:"addresses"},
+];
+
+const similarityEdges = [
+  {src:"dormant fidelity", tgt:"negative decision loss", score:0.496},
+  {src:"dormant fidelity", tgt:"fidelity signature", score:0.492},
+  {src:"basin key", tgt:"antigenic sin in basin keys", score:0.480},
+  {src:"dormant fidelity", tgt:"operational fidelity defense", score:0.420},
+  {src:"dormant fidelity", tgt:"retrieval trigger architecture", score:0.417},
+  {src:"wake problem", tgt:"operational fidelity defense", score:0.394},
+  {src:"negative decision loss", tgt:"instrument compaction losses", score:0.388},
+  {src:"hollowing of terms", tgt:"genre-ification", score:0.386},
+  {src:"negative decision loss", tgt:"curated silence", score:0.380},
+];
+
+let showCurated=true, showComputed=true, showBoth=false;
+let hoveredNode=null, dragNode=null, lastMouse=null;
+
+const canvas = document.getElementById('graphCanvas');
+const ctx = canvas.getContext('2d');
+const W=760, H=480;
+
+function getNode(id){ return nodes.find(n=>n.id===id); }
+
+function toggleEdgeType(type){
+  if(type==='curated'){
+    showCurated=!showCurated;
+    document.getElementById('btn-curated').classList.toggle('active');
+  } else if(type==='computed'){
+    showComputed=!showComputed;
+    document.getElementById('btn-computed').classList.toggle('active');
+  } else {
+    showBoth=!showBoth;
+    document.getElementById('btn-both').classList.toggle('active');
+  }
+  draw();
+}
+
+function draw(){
+  ctx.fillStyle='#f7f8fa';
+  ctx.fillRect(0,0,W,H);
+
+  // Draw edges
+  if(showCurated && !showBoth){
+    curatedEdges.forEach(e=>{
+      const s=getNode(e.src), t=getNode(e.tgt);
+      if(!s||!t) return;
+      ctx.strokeStyle='rgba(26,79,163,0.5)';
+      ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(t.x,t.y);ctx.stroke();
+      // predicate label
+      const mx=(s.x+t.x)/2, my=(s.y+t.y)/2;
+      ctx.font='9px Courier New';
+      ctx.fillStyle='rgba(26,79,163,0.6)';
+      ctx.fillText(e.pred, mx+4, my-4);
+    });
+  }
+
+  if(showComputed && !showBoth){
+    similarityEdges.forEach(e=>{
+      const s=getNode(e.src), t=getNode(e.tgt);
+      if(!s||!t) return;
+      ctx.strokeStyle='rgba(192,80,32,0.45)';
+      ctx.lineWidth=1.5;
+      ctx.setLineDash([6,4]);
+      ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(t.x,t.y);ctx.stroke();
+      ctx.setLineDash([]);
+      // score label
+      const mx=(s.x+t.x)/2, my=(s.y+t.y)/2;
+      ctx.font='9px Courier New';
+      ctx.fillStyle='rgba(192,80,32,0.7)';
+      ctx.fillText(e.score.toFixed(2), mx+4, my+10);
+    });
+  }
+
+  if(showBoth){
+    // Show only edges that appear in BOTH layers
+    similarityEdges.forEach(se=>{
+      const hasCurated = curatedEdges.some(ce=>
+        (ce.src===se.src && ce.tgt===se.tgt) || (ce.src===se.tgt && ce.tgt===se.src)
+      );
+      if(!hasCurated) return;
+      const s=getNode(se.src), t=getNode(se.tgt);
+      if(!s||!t) return;
+      ctx.strokeStyle='rgba(10,122,106,0.7)';
+      ctx.lineWidth=3;
+      ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(t.x,t.y);ctx.stroke();
+      const mx=(s.x+t.x)/2, my=(s.y+t.y)/2;
+      ctx.font='10px Courier New';
+      ctx.fillStyle='rgba(10,122,106,0.8)';
+      ctx.fillText('✓ '+se.score.toFixed(2), mx+4, my-4);
+    });
+    // Show discovery edges (similarity but no curated)
+    similarityEdges.forEach(se=>{
+      const hasCurated = curatedEdges.some(ce=>
+        (ce.src===se.src && ce.tgt===se.tgt) || (ce.src===se.tgt && ce.tgt===se.src)
+      );
+      if(hasCurated) return;
+      const s=getNode(se.src), t=getNode(se.tgt);
+      if(!s||!t) return;
+      ctx.strokeStyle='rgba(192,80,32,0.6)';
+      ctx.lineWidth=2;
+      ctx.setLineDash([6,4]);
+      ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(t.x,t.y);ctx.stroke();
+      ctx.setLineDash([]);
+      const mx=(s.x+t.x)/2, my=(s.y+t.y)/2;
+      ctx.font='10px Courier New';
+      ctx.fillStyle='rgba(192,80,32,0.8)';
+      ctx.fillText('? '+se.score.toFixed(2), mx+4, my+10);
+    });
+  }
+
+  // Draw nodes
+  nodes.forEach(n=>{
+    const isHovered = hoveredNode===n;
+    const r = isHovered ? 8 : 6;
+
+    ctx.fillStyle = isHovered ? '#1a4fa3' : '#333';
+    ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI*2); ctx.fill();
+
+    ctx.fillStyle = isHovered ? '#1a4fa3' : '#333';
+    ctx.font = isHovered ? 'bold 11px Courier New' : '10px Courier New';
+
+    // Wrap long names
+    const name = n.id.length > 25 ? n.id.substring(0,22)+'...' : n.id;
+    ctx.fillText(name, n.x+12, n.y+4);
+  });
+
+  // Tooltip
+  if(hoveredNode){
+    const n = hoveredNode;
+    const tw = ctx.measureText(n.desc).width + 16;
+    const tx = Math.min(n.x+15, W-tw-10);
+    const ty = n.y - 24;
+    ctx.fillStyle='rgba(255,255,255,0.95)';
+    ctx.strokeStyle='#ccc';ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.roundRect(tx, ty-14, tw, 22, 3);
+    ctx.fill();ctx.stroke();
+    ctx.fillStyle='#333';ctx.font='11px Georgia';
+    ctx.fillText(n.desc, tx+8, ty+2);
+  }
+}
+
+canvas.addEventListener('mousemove', e=>{
+  const r = canvas.getBoundingClientRect();
+  const mx = e.clientX-r.left, my = e.clientY-r.top;
+
+  if(dragNode){
+    dragNode.x = mx;
+    dragNode.y = my;
+    draw();
+    return;
+  }
+
+  hoveredNode = null;
+  for(const n of nodes){
+    const d = Math.sqrt((mx-n.x)**2+(my-n.y)**2);
+    if(d < 16){ hoveredNode = n; break; }
+  }
+  canvas.style.cursor = hoveredNode ? 'grab' : 'default';
+  draw();
+});
+
+canvas.addEventListener('mousedown', e=>{
+  if(hoveredNode){
+    dragNode = hoveredNode;
+    canvas.style.cursor = 'grabbing';
+  }
+});
+
+canvas.addEventListener('mouseup', ()=>{ dragNode=null; });
+canvas.addEventListener('mouseleave', ()=>{ dragNode=null; hoveredNode=null; draw(); });
+
+draw();
+</script>
+</body>
+</html>

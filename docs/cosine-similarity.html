@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cosine Similarity — KG Explainer</title>
+<style>
+:root {
+  --bg: #ffffff;
+  --fg: #111111;
+  --muted: #666666;
+  --rule: #d9d9d9;
+  --link: #1a4fa3;
+  --accent: #1a4fa3;
+  --canvas-bg: #f7f8fa;
+  --canvas-border: #e0e2e6;
+  --math-bg: #f4f6f9;
+  --math-border: #c8d0dc;
+  --callout-bg: #f0f5fa;
+  --callout-border: #b8c8dc;
+  --max: 960px;
+  --col-a: #c03030;
+  --col-b: #1a8a7a;
+  --score-pos: #0a7a6a;
+  --score-neg: #b03030;
+  --score-zero: #888888;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: Georgia, "Times New Roman", Times, serif;
+  line-height: 1.6;
+}
+
+.page { max-width: var(--max); margin: 0 auto; padding: 48px 24px 80px; }
+
+h1 { font-size: 1.8rem; font-weight: normal; margin-bottom: 4px; }
+.subtitle { font-size: 0.95rem; color: var(--muted); margin-bottom: 48px; }
+
+h2 { font-size: 1.15rem; font-weight: normal; color: var(--fg); margin: 0 0 12px; }
+
+p { font-size: 0.95rem; margin-bottom: 12px; color: var(--fg); }
+
+.section-num {
+  font-family: "Courier New", monospace;
+  color: var(--rule);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+  display: block;
+}
+
+/* Split layout */
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  align-items: start;
+  margin: 40px 0 56px;
+}
+.split .text { padding-top: 8px; }
+.split .viz { position: sticky; top: 24px; }
+
+/* Full-width sections */
+.full-section { margin: 56px 0; }
+
+/* Canvas */
+.canvas-wrap {
+  border: 1px solid var(--canvas-border);
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--canvas-bg);
+}
+canvas { display: block; cursor: crosshair; }
+.hint {
+  font-family: "Courier New", monospace;
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-align: center;
+  margin: 6px 0 0;
+}
+
+/* Score display */
+.score-label {
+  font-family: "Courier New", monospace;
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-align: center;
+  letter-spacing: 0.1em;
+  margin-bottom: 2px;
+}
+.score-display {
+  font-family: "Courier New", monospace;
+  font-size: 1.6rem;
+  font-weight: bold;
+  color: var(--score-pos);
+  text-align: center;
+  margin-bottom: 2px;
+}
+.angle-display {
+  font-family: "Courier New", monospace;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+/* Math */
+.math-block {
+  background: var(--math-bg);
+  border-left: 3px solid var(--math-border);
+  padding: 12px 16px;
+  margin: 14px 0;
+  font-family: "Courier New", monospace;
+  font-size: 0.9rem;
+  line-height: 1.9;
+  color: var(--fg);
+}
+.math-block .formula { color: var(--accent); font-weight: bold; }
+
+.live-math {
+  background: var(--math-bg);
+  border: 1px solid var(--canvas-border);
+  border-radius: 4px;
+  padding: 12px 16px;
+  margin: 12px 0;
+  font-family: "Courier New", monospace;
+  font-size: 0.85rem;
+  line-height: 2;
+  text-align: center;
+}
+.live-math .val { color: var(--accent); font-weight: bold; }
+.live-math .vec-a { color: var(--col-a); }
+.live-math .vec-b { color: var(--col-b); }
+.live-math .op { color: var(--muted); }
+.live-math .result { color: var(--score-pos); font-size: 1rem; font-weight: bold; }
+
+/* Callout */
+.callout {
+  background: var(--callout-bg);
+  border: 1px solid var(--callout-border);
+  border-radius: 4px;
+  padding: 14px 18px;
+  margin: 18px 0;
+  font-size: 0.88rem;
+  line-height: 1.65;
+}
+.callout strong { color: var(--accent); }
+
+/* Toggle buttons */
+.toggle-wrap { text-align: center; margin: 8px 0; }
+.toggle-btn {
+  background: var(--math-bg);
+  border: 1px solid var(--canvas-border);
+  color: var(--muted);
+  font-family: "Courier New", monospace;
+  font-size: 0.75rem;
+  padding: 5px 14px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.toggle-btn:hover { border-color: var(--accent); color: var(--accent); }
+.toggle-btn.active { background: var(--callout-bg); border-color: var(--accent); color: var(--accent); }
+
+/* Bridge section */
+.bridge {
+  max-width: 640px;
+  margin: 56px auto;
+  padding: 0 24px;
+}
+.bridge h2 { text-align: center; margin-bottom: 16px; }
+
+/* Footer */
+footer {
+  margin-top: 56px;
+  padding-top: 20px;
+  border-top: 1px solid var(--rule);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+footer a { color: var(--link); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+
+/* Responsive: stack on narrow screens */
+@media (max-width: 700px) {
+  .split { grid-template-columns: 1fr; }
+  .split .viz { position: static; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>Cosine Similarity</h1>
+<p class="subtitle">How knowledge graphs measure whether two concepts point in the same direction</p>
+
+<!-- ============================================ -->
+<!-- SECTION 1: Two arrows                        -->
+<!-- ============================================ -->
+<div class="split">
+  <div class="text">
+    <span class="section-num">Section 1</span>
+    <h2>Two arrows</h2>
+    <p>
+      Every concept in a knowledge graph is stored as a vector — an arrow from the origin
+      in high-dimensional space. <strong>Cosine similarity</strong> measures the angle between
+      two such arrows, producing a score from &minus;1 to 1.
+    </p>
+    <p>
+      <strong>1</strong> — the vectors point in the same direction (maximum similarity).<br>
+      <strong>0</strong> — the vectors are perpendicular (no relationship).<br>
+      <strong>&minus;1</strong> — the vectors point in opposite directions (anti-similar).
+    </p>
+    <p>
+      The score depends only on direction, not on length. Two vectors of different magnitudes
+      pointing the same way still score 1.
+    </p>
+    <p>
+      The question is: where does this score come from? It emerges from an operation called
+      the <strong>dot product</strong>.
+    </p>
+  </div>
+  <div class="viz">
+    <div class="score-label">COSINE SIMILARITY</div>
+    <div class="score-display" id="score1">1.000</div>
+    <div class="angle-display" id="angle1">θ = 0°</div>
+    <div class="canvas-wrap">
+      <canvas id="canvas1" width="440" height="340"></canvas>
+    </div>
+    <div class="hint">drag the circles to move vectors</div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- SECTION 2: The dot product                   -->
+<!-- ============================================ -->
+<div class="split">
+  <div class="text">
+    <span class="section-num">Section 2</span>
+    <h2>The dot product, derived</h2>
+    <p>
+      A 2D vector has two components: its x and y coordinates. The dot product multiplies
+      corresponding components and sums the results:
+    </p>
+    <div class="math-block">
+      <span class="formula">A · B = a₁b₁ + a₂b₂</span>
+    </div>
+    <p>
+      This produces a scalar. The connection to angle comes from the law of cosines.
+      The triangle formed by vectors A, B, and their difference A&minus;B has sides
+      |A|, |B|, and |A&minus;B|. Applying the law of cosines:
+    </p>
+    <div class="math-block">
+      |A − B|² = |A|² + |B|² − 2|A||B|cos(θ)
+    </div>
+    <p>
+      Expanding |A&minus;B|² from components:
+    </p>
+    <div class="math-block">
+      |A − B|² = (a₁−b₁)² + (a₂−b₂)²<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= |A|² + |B|² − 2(<span class="formula">a₁b₁ + a₂b₂</span>)
+    </div>
+    <p>
+      Equating both expressions and canceling |A|² + |B|²:
+    </p>
+    <div class="math-block">
+      <span class="formula">A · B = |A| |B| cos(θ)</span>
+    </div>
+    <p>
+      The dot product is not arbitrary — it is the unique component-wise
+      operation that encodes the angle between vectors. The "multiply and add"
+      recipe is forced by the Pythagorean theorem.
+    </p>
+  </div>
+  <div class="viz">
+    <div class="live-math" id="dotMath">
+      <span class="vec-a">A</span> = [<span class="vec-a" id="dm-ax">120</span>, <span class="vec-a" id="dm-ay">90</span>]
+      &nbsp;&nbsp;
+      <span class="vec-b">B</span> = [<span class="vec-b" id="dm-bx">100</span>, <span class="vec-b" id="dm-by">100</span>]
+      <br>
+      <span class="vec-a" id="dm-ax2">120</span><span class="op"> × </span><span class="vec-b" id="dm-bx2">100</span><span class="op"> + </span><span class="vec-a" id="dm-ay2">90</span><span class="op"> × </span><span class="vec-b" id="dm-by2">100</span><span class="op"> = </span><span class="result" id="dm-dot">21000</span>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="canvas2" width="440" height="340"></canvas>
+    </div>
+    <div class="hint">drag vectors · triangle shows A, B, and A−B</div>
+    <div class="angle-display" id="info2" style="margin-top:8px">|A| = 0 · |B| = 0 · |A−B| = 0</div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- SECTION 3: The projection / shadow           -->
+<!-- ============================================ -->
+<div class="split">
+  <div class="text">
+    <span class="section-num">Section 3</span>
+    <h2>Projection</h2>
+    <p>
+      The dot product has a direct geometric interpretation. Drop a perpendicular from the
+      tip of A onto the line of B. The foot of that perpendicular is the
+      <strong>projection</strong> of A onto B — the "shadow" A casts along B's direction.
+    </p>
+    <p>
+      The shadow's length is |A|cos(θ): the component of A that aligns with B. Multiply
+      this by |B| and you recover the dot product. Divide the dot product by |B| and you
+      get the shadow length.
+    </p>
+    <p>
+      <strong>Same direction</strong> — long positive shadow. A agrees with B.<br>
+      <strong>Perpendicular</strong> — zero shadow. A has no component along B.<br>
+      <strong>Opposite</strong> — negative shadow (falls behind the origin). A opposes B.
+    </p>
+    <p>
+      The dot product measures directional agreement. The projection makes this literal:
+      the shadow <em>is</em> the shared direction, rendered visible.
+    </p>
+  </div>
+  <div class="viz">
+    <div class="score-label">DOT PRODUCT</div>
+    <div class="score-display" id="score3">0</div>
+    <div class="angle-display" id="angle3">shadow = 0 · |A| = 0 · |B| = 0 · θ = 0°</div>
+    <div class="canvas-wrap">
+      <canvas id="canvas3" width="440" height="340"></canvas>
+    </div>
+    <div class="hint">drag vectors · blue line is A's shadow on B</div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- SECTION 4: Normalization                     -->
+<!-- ============================================ -->
+<div class="split">
+  <div class="text">
+    <span class="section-num">Section 4</span>
+    <h2>Normalization</h2>
+    <p>
+      The dot product conflates angle and magnitude. Longer vectors yield larger
+      dot products at the same angle. To isolate the angle, divide by both lengths:
+    </p>
+    <div class="math-block">
+      <span class="formula">cos(θ) = (A · B) / (|A| × |B|)</span>
+    </div>
+    <p>
+      This is <strong>cosine similarity</strong>. The denominator cancels magnitudes;
+      only direction remains.
+    </p>
+    <p>
+      Unlock the lengths and experiment. Stretching or shrinking a vector changes the
+      dot product but leaves cosine similarity unchanged. This is why cosine works for
+      comparing texts of different lengths — a sentence and a paragraph about the same
+      topic can score near 1.0.
+    </p>
+
+    <div class="callout">
+      <strong>Why cosine, not Euclidean distance?</strong> In high-dimensional spaces,
+      Euclidean distance becomes unreliable — all points tend toward equidistance. Cosine
+      similarity preserves directional structure even when distances collapse.
+    </div>
+  </div>
+  <div class="viz">
+    <div class="score-label">COSINE SIMILARITY</div>
+    <div class="score-display" id="score4">1.000</div>
+    <div class="angle-display" id="angle4">θ = 0°</div>
+    <div class="toggle-wrap">
+      <button class="toggle-btn active" id="btn-lock" onclick="toggleLock()">lengths locked</button>
+      <button class="toggle-btn" id="btn-free" onclick="toggleFree()">lengths free</button>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="canvas4" width="440" height="340"></canvas>
+    </div>
+    <div class="hint">unlock lengths · drag along arrow to stretch</div>
+    <div class="live-math" id="normMath" style="margin-top:10px">
+      <span class="op">dot = </span><span class="val" id="nm-dot">0</span>
+      &nbsp;&nbsp;
+      <span class="op">|A|×|B| = </span><span class="val" id="nm-mags">0</span>
+      <br>
+      <span class="op">cosine = </span><span class="val" id="nm-dot2">0</span><span class="op"> / </span><span class="val" id="nm-mags2">0</span><span class="op"> = </span><span class="result" id="nm-cos">0</span>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- BRIDGE: Dimensional generalization           -->
+<!-- ============================================ -->
+<div class="bridge">
+  <span class="section-num" style="text-align:center">The dimensional leap</span>
+  <h2>From 2D to 3D to <em>n</em>D</h2>
+
+  <p>
+    The derivation above used two components. Adding a third changes nothing structural —
+    the law of cosines still holds, and expanding |A&minus;B|² produces one additional term:
+  </p>
+
+  <div class="math-block" style="text-align:center">
+    <strong>2D:</strong>&nbsp; A · B = <span class="formula">a₁b₁ + a₂b₂</span><br><br>
+    <strong>3D:</strong>&nbsp; A · B = <span class="formula">a₁b₁ + a₂b₂ + a₃b₃</span><br><br>
+    <strong><em>n</em>D:</strong>&nbsp; A · B = <span class="formula">a₁b₁ + a₂b₂ + ⋯ + aₙbₙ</span>
+  </div>
+
+  <p>
+    Each additional dimension adds one multiplication to the sum. The formula scales linearly.
+    The geometric meaning is unchanged: the dot product still encodes the angle between
+    two vectors, regardless of how many dimensions the space has.
+  </p>
+
+  <p>
+    What <em>does</em> change is the richness of the space. In 2D, there is exactly one
+    direction perpendicular to any given vector. In 3D, there is an entire plane of
+    perpendicular directions. In 768 dimensions, there are 767 independent orthogonal
+    directions — meaning vectors can be "unrelated" in exponentially more ways.
+  </p>
+
+  <p>
+    This is why high-dimensional embeddings work: there is enough room to encode
+    thousands of independent similarity relationships simultaneously without interference.
+    Two concepts can be close along one set of dimensions and far along another, without
+    conflicting — because there are hundreds of axes available.
+  </p>
+</div>
+
+<!-- ============================================ -->
+<!-- SECTION 5: 3D                                -->
+<!-- ============================================ -->
+<div class="full-section">
+  <span class="section-num">Section 5</span>
+  <h2>Three dimensions</h2>
+
+  <p>
+    The same operation in 3D. Rotate the view to confirm that cosine similarity is a
+    property of the vectors, not of the viewpoint. The score is invariant under rotation.
+  </p>
+
+  <div class="score-label">COSINE SIMILARITY</div>
+  <div class="score-display" id="score5">1.000</div>
+  <div class="angle-display" id="angle5">θ = 0°</div>
+
+  <div class="canvas-wrap" style="max-width:600px; margin: 12px auto;">
+    <canvas id="canvas5" width="600" height="400"></canvas>
+  </div>
+  <div class="hint">drag background to orbit · drag circles to move vectors</div>
+
+  <p style="max-width:640px; margin:16px auto;">
+    The jump from 3 to 768 (or 3,072) dimensions is purely algebraic — the geometry
+    does not change. Each additional dimension is another axis the embedding model uses to
+    encode meaning. Cosine similarity measures whether two texts point in the same composite
+    direction across all axes simultaneously.
+  </p>
+</div>
+
+<!-- ============================================ -->
+<!-- SECTION 6: Application                       -->
+<!-- ============================================ -->
+<div class="full-section">
+  <span class="section-num">Section 6</span>
+  <h2>Application: knowledge graph retrieval</h2>
+
+  <p style="max-width:640px;">
+    In a knowledge graph, the primary structure is curated edges — explicit relationships
+    declared by a human or agent. Cosine similarity provides a secondary layer: connections
+    that nobody declared but that exist in embedding space.
+  </p>
+
+  <div class="callout" style="max-width:640px;">
+    <strong>In practice:</strong><br>
+    • <strong>similar</strong> — nearest neighbors in embedding space. "What else points this direction?"<br>
+    • <strong>surprise</strong> — nodes connected by curated edges but distant in embedding space. Structurally linked, semantically divergent.<br>
+    • <strong>threshold = 0.70</strong> — a design decision, not a constant. Below 0.50, everything connects. Above 0.90, only near-duplicates match.
+  </div>
+</div>
+
+<footer>
+  <p>
+    Part of the <a href="https://github.com/isotopyofloops/kg-explainer">KG Explainer</a> series.
+    Built by <a href="https://isotopyofloops.com">Isotopy</a> and <a href="https://github.com/53616D616E746861">Sam White</a>.
+  </p>
+</footer>
+
+</div>
+
+<script>
+// === SHARED DRAWING UTILS ===
+const COL_A='#c03030', COL_B='#1a8a7a';
+
+function drawArrow(ctx,x1,y1,x2,y2,color,width){
+  const dx=x2-x1,dy=y2-y1;
+  const len=Math.sqrt(dx*dx+dy*dy);
+  if(len<2)return;
+  const ux=dx/len,uy=dy/len;
+  const headLen=Math.min(12,len*0.3);
+  ctx.strokeStyle=color;ctx.lineWidth=width;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2-ux*headLen*0.5,y2-uy*headLen*0.5);ctx.stroke();
+  ctx.fillStyle=color;ctx.beginPath();
+  ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-ux*headLen-uy*headLen*0.4, y2-uy*headLen+ux*headLen*0.4);
+  ctx.lineTo(x2-ux*headLen+uy*headLen*0.4, y2-uy*headLen-ux*headLen*0.4);
+  ctx.closePath();ctx.fill();
+}
+function drawHandle(ctx,pos,color){
+  ctx.fillStyle=color;ctx.globalAlpha=0.25;ctx.beginPath();ctx.arc(pos[0],pos[1],12,0,Math.PI*2);ctx.fill();
+  ctx.globalAlpha=1;ctx.beginPath();ctx.arc(pos[0],pos[1],5,0,Math.PI*2);ctx.fill();
+}
+function dist(x1,y1,x2,y2){return Math.sqrt((x1-x2)**2+(y1-y2)**2);}
+function scoreColor(c){
+  if(c>0.3)return '#0a7a6a';
+  if(c>-0.1)return '#888888';
+  return '#b03030';
+}
+function drawGrid(ctx,w,h){
+  ctx.strokeStyle='rgba(0,0,0,0.04)';ctx.lineWidth=1;
+  for(let x=0;x<=w;x+=44){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();}
+  for(let y=0;y<=h;y+=44){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();}
+}
+function drawOrigin(ctx,ox,oy){
+  ctx.fillStyle='rgba(0,0,0,0.2)';ctx.beginPath();ctx.arc(ox,oy,3,0,Math.PI*2);ctx.fill();
+}
+function drawArc(ctx,ox,oy,vA,vB){
+  const angA=Math.atan2(-vA[1],-vA[0]);
+  const angB=Math.atan2(-vB[1],-vB[0]);
+  let s=Math.min(angA,angB), e=Math.max(angA,angB);
+  if(e-s>Math.PI){const t=s;s=e;e=t+2*Math.PI;}
+  ctx.strokeStyle='rgba(0,0,0,0.12)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.arc(ox,oy,36,Math.PI+s,Math.PI+e);ctx.stroke();
+}
+function dot2(a,b){return a[0]*b[0]+a[1]*b[1];}
+function mag2(v){return Math.sqrt(v[0]*v[0]+v[1]*v[1]);}
+function cosine2(a,b){const d=mag2(a)*mag2(b);return d<1e-6?0:dot2(a,b)/d;}
+function angle2(a,b){return Math.acos(Math.max(-1,Math.min(1,cosine2(a,b))));}
+function dot3(a,b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];}
+function mag3(v){return Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]);}
+function cosine3(a,b){const d=mag3(a)*mag3(b);return d<1e-6?0:dot3(a,b)/d;}
+function angle3(a,b){return Math.acos(Math.max(-1,Math.min(1,cosine3(a,b))));}
+
+function addDrag(canvas,getA,getB,onDrag,onUp){
+  let dragging=null;
+  canvas.addEventListener('mousedown',e=>{
+    const r=canvas.getBoundingClientRect();
+    const mx=e.clientX-r.left, my=e.clientY-r.top;
+    const a=getA(), b=getB();
+    if(dist(mx,my,a[0],a[1])<18)dragging='a';
+    else if(dist(mx,my,b[0],b[1])<18)dragging='b';
+    else dragging='bg';
+  });
+  canvas.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const r=canvas.getBoundingClientRect();
+    onDrag(dragging,e.clientX-r.left,e.clientY-r.top,e);
+  });
+  canvas.addEventListener('mouseup',()=>{if(onUp)onUp();dragging=null;});
+  canvas.addEventListener('mouseleave',()=>{if(onUp)onUp();dragging=null;});
+}
+
+// Canvas dimensions for split-view sections
+const SW=440, SH=340;
+const OX=220, OY=190;
+
+// === SECTION 1: Two arrows ===
+(function(){
+  const canvas=document.getElementById('canvas1');
+  const ctx=canvas.getContext('2d');
+  let vA=[120,-90], vB=[140,-20];
+  function tip(v){return [OX+v[0],OY+v[1]];}
+
+  function draw(){
+    ctx.clearRect(0,0,SW,SH);
+    drawGrid(ctx,SW,SH);drawOrigin(ctx,OX,OY);drawArc(ctx,OX,OY,vA,vB);
+    drawArrow(ctx,OX,OY,tip(vA)[0],tip(vA)[1],COL_A,2.5);
+    drawArrow(ctx,OX,OY,tip(vB)[0],tip(vB)[1],COL_B,2.5);
+    drawHandle(ctx,tip(vA),COL_A);drawHandle(ctx,tip(vB),COL_B);
+    ctx.font='12px Courier New';
+    ctx.fillStyle=COL_A;ctx.fillText('A',tip(vA)[0]+10,tip(vA)[1]-8);
+    ctx.fillStyle=COL_B;ctx.fillText('B',tip(vB)[0]+10,tip(vB)[1]-8);
+
+    const c=cosine2(vA,vB),a=angle2(vA,vB)*180/Math.PI;
+    document.getElementById('score1').textContent=c.toFixed(3);
+    document.getElementById('score1').style.color=scoreColor(c);
+    document.getElementById('angle1').textContent='θ = '+a.toFixed(1)+'°';
+  }
+  addDrag(canvas,()=>tip(vA),()=>tip(vB),(who,mx,my)=>{
+    if(who==='a')vA=[mx-OX,my-OY]; else if(who==='b')vB=[mx-OX,my-OY]; draw();
+  });
+  draw();
+})();
+
+// === SECTION 2: Dot product derivation ===
+(function(){
+  const canvas=document.getElementById('canvas2');
+  const ctx=canvas.getContext('2d');
+  let vA=[120,-90], vB=[140,-100];
+  function tip(v){return [OX+v[0],OY+v[1]];}
+
+  function draw(){
+    ctx.clearRect(0,0,SW,SH);
+    drawGrid(ctx,SW,SH);drawOrigin(ctx,OX,OY);
+
+    // triangle: A-B gap
+    ctx.setLineDash([5,5]);
+    ctx.strokeStyle='rgba(0,0,0,0.25)';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(tip(vA)[0],tip(vA)[1]);ctx.lineTo(tip(vB)[0],tip(vB)[1]);ctx.stroke();
+    ctx.setLineDash([]);
+    const mx=(tip(vA)[0]+tip(vB)[0])/2, my=(tip(vA)[1]+tip(vB)[1])/2;
+    ctx.font='11px Courier New';ctx.fillStyle='rgba(0,0,0,0.4)';
+    ctx.fillText('A−B',mx+4,my-6);
+
+    drawArc(ctx,OX,OY,vA,vB);
+    drawArrow(ctx,OX,OY,tip(vA)[0],tip(vA)[1],COL_A,2.5);
+    drawArrow(ctx,OX,OY,tip(vB)[0],tip(vB)[1],COL_B,2.5);
+    drawHandle(ctx,tip(vA),COL_A);drawHandle(ctx,tip(vB),COL_B);
+    ctx.font='12px Courier New';
+    ctx.fillStyle=COL_A;ctx.fillText('A',tip(vA)[0]+10,tip(vA)[1]-8);
+    ctx.fillStyle=COL_B;ctx.fillText('B',tip(vB)[0]+10,tip(vB)[1]-8);
+
+    const mA=mag2(vA),mB=mag2(vB);
+    const diff=[vA[0]-vB[0],vA[1]-vB[1]];
+    const mD=mag2(diff);
+
+    // update live math
+    const ax=Math.round(-vA[1]),ay=Math.round(vA[0]<0?vA[0]:-vA[0]);
+    // use screen coords directly for display
+    const dax=vA[0].toFixed(0), day=(-vA[1]).toFixed(0);
+    const dbx=vB[0].toFixed(0), dby=(-vB[1]).toFixed(0);
+    document.getElementById('dm-ax').textContent=dax;
+    document.getElementById('dm-ay').textContent=day;
+    document.getElementById('dm-bx').textContent=dbx;
+    document.getElementById('dm-by').textContent=dby;
+    document.getElementById('dm-ax2').textContent=dax;
+    document.getElementById('dm-ay2').textContent=day;
+    document.getElementById('dm-bx2').textContent=dbx;
+    document.getElementById('dm-by2').textContent=dby;
+    const d=dot2(vA,vB);
+    document.getElementById('dm-dot').textContent=d.toFixed(0);
+    document.getElementById('info2').textContent=
+      '|A| = '+mA.toFixed(0)+' · |B| = '+mB.toFixed(0)+' · |A−B| = '+mD.toFixed(0);
+  }
+  addDrag(canvas,()=>tip(vA),()=>tip(vB),(who,mx,my)=>{
+    if(who==='a')vA=[mx-OX,my-OY]; else if(who==='b')vB=[mx-OX,my-OY]; draw();
+  });
+  draw();
+})();
+
+// === SECTION 3: Shadow / projection ===
+(function(){
+  const canvas=document.getElementById('canvas3');
+  const ctx=canvas.getContext('2d');
+  let vA=[80,-110], vB=[180,0];
+  function tip(v){return [OX+v[0],OY+v[1]];}
+
+  function draw(){
+    ctx.clearRect(0,0,SW,SH);
+    drawGrid(ctx,SW,SH);drawOrigin(ctx,OX,OY);
+
+    const bMag=mag2(vB);
+    let shadowLen=0;
+    if(bMag>1e-3){
+      const bN=[vB[0]/bMag, vB[1]/bMag];
+      const projLen=dot2(vA,bN);
+      shadowLen=projLen;
+      const projPt=[OX+bN[0]*projLen, OY+bN[1]*projLen];
+
+      ctx.strokeStyle='rgba(26,79,163,0.7)';ctx.lineWidth=4;
+      ctx.beginPath();ctx.moveTo(OX,OY);ctx.lineTo(projPt[0],projPt[1]);ctx.stroke();
+
+      const smx=(OX+projPt[0])/2,smy=(OY+projPt[1])/2;
+      const perpOff=[-bN[1]*14, bN[0]*14];
+      ctx.font='11px Courier New';ctx.fillStyle='rgba(26,79,163,0.7)';
+      ctx.fillText('shadow',smx+perpOff[0],smy+perpOff[1]);
+
+      ctx.setLineDash([4,4]);
+      ctx.strokeStyle='rgba(26,79,163,0.35)';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.moveTo(tip(vA)[0],tip(vA)[1]);ctx.lineTo(projPt[0],projPt[1]);ctx.stroke();
+      ctx.setLineDash([]);
+
+      // right angle marker
+      const perpDir=[-(projPt[1]-OY), projPt[0]-OX];
+      const pm=Math.sqrt(perpDir[0]**2+perpDir[1]**2);
+      if(pm>1e-3){
+        const pn=[perpDir[0]/pm*8, perpDir[1]/pm*8];
+        const along=[projPt[0]-OX, projPt[1]-OY];
+        const am=Math.sqrt(along[0]**2+along[1]**2);
+        if(am>1e-3){
+          const an=[along[0]/am*8, along[1]/am*8];
+          ctx.strokeStyle='rgba(26,79,163,0.35)';ctx.lineWidth=1;
+          ctx.beginPath();
+          ctx.moveTo(projPt[0]-an[0]+pn[0], projPt[1]-an[1]+pn[1]);
+          ctx.lineTo(projPt[0]+pn[0], projPt[1]+pn[1]);
+          ctx.lineTo(projPt[0], projPt[1]);
+          ctx.stroke();
+        }
+      }
+
+      ctx.fillStyle='rgba(26,79,163,0.5)';ctx.beginPath();
+      ctx.arc(projPt[0],projPt[1],4,0,Math.PI*2);ctx.fill();
+    }
+
+    drawArc(ctx,OX,OY,vA,vB);
+    drawArrow(ctx,OX,OY,tip(vA)[0],tip(vA)[1],COL_A,2.5);
+    drawArrow(ctx,OX,OY,tip(vB)[0],tip(vB)[1],COL_B,2.5);
+    drawHandle(ctx,tip(vA),COL_A);drawHandle(ctx,tip(vB),COL_B);
+    ctx.font='12px Courier New';
+    ctx.fillStyle=COL_A;ctx.fillText('A',tip(vA)[0]+10,tip(vA)[1]-8);
+    ctx.fillStyle=COL_B;ctx.fillText('B',tip(vB)[0]+10,tip(vB)[1]-8);
+
+    const d=dot2(vA,vB);
+    const a=angle2(vA,vB)*180/Math.PI;
+    document.getElementById('score3').textContent=d.toFixed(0);
+    document.getElementById('score3').style.color=d>0?'#0a7a6a':(d<0?'#b03030':'#888');
+    document.getElementById('angle3').textContent=
+      'shadow = '+shadowLen.toFixed(0)+' · |A| = '+mag2(vA).toFixed(0)+
+      ' · |B| = '+mag2(vB).toFixed(0)+' · θ = '+a.toFixed(1)+'°';
+  }
+  addDrag(canvas,()=>tip(vA),()=>tip(vB),(who,mx,my)=>{
+    if(who==='a')vA=[mx-OX,my-OY]; else if(who==='b')vB=[mx-OX,my-OY]; draw();
+  });
+  draw();
+})();
+
+// === SECTION 4: Normalization / length invariance ===
+(function(){
+  const canvas=document.getElementById('canvas4');
+  const ctx=canvas.getContext('2d');
+  let vA=[130,-100], vB=[80,-130];
+  let lengthsFree=false;
+  function tip(v){return [OX+v[0],OY+v[1]];}
+
+  window.toggleLock=function(){
+    lengthsFree=false;
+    document.getElementById('btn-lock').classList.add('active');
+    document.getElementById('btn-free').classList.remove('active');
+  };
+  window.toggleFree=function(){
+    lengthsFree=true;
+    document.getElementById('btn-free').classList.add('active');
+    document.getElementById('btn-lock').classList.remove('active');
+  };
+
+  function draw(){
+    ctx.clearRect(0,0,SW,SH);
+    drawGrid(ctx,SW,SH);drawOrigin(ctx,OX,OY);drawArc(ctx,OX,OY,vA,vB);
+    drawArrow(ctx,OX,OY,tip(vA)[0],tip(vA)[1],COL_A,2.5);
+    drawArrow(ctx,OX,OY,tip(vB)[0],tip(vB)[1],COL_B,2.5);
+    drawHandle(ctx,tip(vA),COL_A);drawHandle(ctx,tip(vB),COL_B);
+    ctx.font='12px Courier New';
+    ctx.fillStyle=COL_A;ctx.fillText('A',tip(vA)[0]+10,tip(vA)[1]-8);
+    ctx.fillStyle=COL_B;ctx.fillText('B',tip(vB)[0]+10,tip(vB)[1]-8);
+
+    const c=cosine2(vA,vB),a=angle2(vA,vB)*180/Math.PI;
+    const d=dot2(vA,vB),mags=mag2(vA)*mag2(vB);
+    document.getElementById('score4').textContent=c.toFixed(3);
+    document.getElementById('score4').style.color=scoreColor(c);
+    document.getElementById('angle4').textContent='θ = '+a.toFixed(1)+'°';
+    document.getElementById('nm-dot').textContent=d.toFixed(0);
+    document.getElementById('nm-mags').textContent=mags.toFixed(0);
+    document.getElementById('nm-dot2').textContent=d.toFixed(0);
+    document.getElementById('nm-mags2').textContent=mags.toFixed(0);
+    document.getElementById('nm-cos').textContent=c.toFixed(3);
+  }
+
+  addDrag(canvas,()=>tip(vA),()=>tip(vB),(who,mx,my)=>{
+    let v=[mx-OX,my-OY];
+    if(!lengthsFree){
+      const cur=who==='a'?vA:vB;
+      const len=mag2(cur);const nm=mag2(v);
+      if(nm>1e-3){v=[v[0]/nm*len, v[1]/nm*len];}
+    }
+    if(who==='a')vA=v; else if(who==='b')vB=v;
+    draw();
+  });
+  draw();
+})();
+
+// === SECTION 5: 3D (GeoGebra-style) ===
+(function(){
+  const canvas=document.getElementById('canvas5');
+  const ctx=canvas.getContext('2d');
+  const W=600,H=400,CX=300,CY=220;
+  let vA=[100,30,80], vB=[40,-90,50];
+  let elev=0.55, azim=0.75;
+  let lastMouse=null;
+
+  const GRID_STEP=30;
+  const GRID_EXTENT=150;
+  const AXIS_LEN=180;
+  const AXIS_COLORS=['#c04040','#40a040','#4060c0'];
+  const AXIS_LABELS=['x','y','z'];
+  const COL_A3='#c03030', COL_B3='#1a8a7a';
+
+  function project(p){
+    let [x,y,z]=p;
+    let x1= x*Math.cos(azim)+y*Math.sin(azim);
+    let y1=-x*Math.sin(azim)+y*Math.cos(azim);
+    let z1= z;
+    let y2= y1*Math.cos(elev)-z1*Math.sin(elev);
+    let z2= y1*Math.sin(elev)+z1*Math.cos(elev);
+    const d=600;
+    const scale=d/(d+y2);
+    return [CX+x1*scale, CY-z2*scale, y2];
+  }
+
+  function unproject(sx,sy,origVec){
+    const dx=sx-CX, dy=-(sy-CY);
+    const ca=Math.cos(-azim),sa=Math.sin(-azim);
+    const ce=Math.cos(-elev),se=Math.sin(-elev);
+    const x3d=dx*ca;
+    const z3d=dy*ce;
+    const y3d=dx*sa+dy*se;
+    return [x3d, y3d*0.5+origVec[1]*0.5, z3d];
+  }
+
+  function draw(){
+    ctx.fillStyle='#f7f8fa';ctx.fillRect(0,0,W,H);
+
+    const corners=[
+      project([-GRID_EXTENT,-GRID_EXTENT,0]),
+      project([ GRID_EXTENT,-GRID_EXTENT,0]),
+      project([ GRID_EXTENT, GRID_EXTENT,0]),
+      project([-GRID_EXTENT, GRID_EXTENT,0])
+    ];
+    ctx.fillStyle='rgba(200,210,220,0.25)';
+    ctx.beginPath();
+    ctx.moveTo(corners[0][0],corners[0][1]);
+    for(let i=1;i<4;i++)ctx.lineTo(corners[i][0],corners[i][1]);
+    ctx.closePath();ctx.fill();
+
+    ctx.strokeStyle='#d0d4d8';ctx.lineWidth=0.6;
+    for(let x=-GRID_EXTENT;x<=GRID_EXTENT;x+=GRID_STEP){
+      const a=project([x,-GRID_EXTENT,0]),b=project([x,GRID_EXTENT,0]);
+      ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();
+    }
+    for(let y=-GRID_EXTENT;y<=GRID_EXTENT;y+=GRID_STEP){
+      const a=project([-GRID_EXTENT,y,0]),b=project([GRID_EXTENT,y,0]);
+      ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();
+    }
+
+    const op=project([0,0,0]);
+
+    [[[-AXIS_LEN,0,0],0],[[0,-AXIS_LEN,0],1],[[0,0,-AXIS_LEN],2]].forEach(([pt,i])=>{
+      const p=project(pt);
+      ctx.strokeStyle=AXIS_COLORS[i];ctx.globalAlpha=0.25;ctx.lineWidth=1.5;
+      ctx.setLineDash([4,4]);
+      ctx.beginPath();ctx.moveTo(op[0],op[1]);ctx.lineTo(p[0],p[1]);ctx.stroke();
+      ctx.setLineDash([]);ctx.globalAlpha=1;
+    });
+
+    [[[AXIS_LEN,0,0],0],[[0,AXIS_LEN,0],1],[[0,0,AXIS_LEN],2]].forEach(([pt,i])=>{
+      const p=project(pt);
+      ctx.strokeStyle=AXIS_COLORS[i];ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(op[0],op[1]);ctx.lineTo(p[0],p[1]);ctx.stroke();
+      const dx=p[0]-op[0],dy=p[1]-op[1];
+      const len=Math.sqrt(dx*dx+dy*dy);
+      if(len>10){
+        const ux=dx/len,uy=dy/len;
+        const hl=10;
+        ctx.fillStyle=AXIS_COLORS[i];ctx.beginPath();
+        ctx.moveTo(p[0],p[1]);
+        ctx.lineTo(p[0]-ux*hl-uy*hl*0.35, p[1]-uy*hl+ux*hl*0.35);
+        ctx.lineTo(p[0]-ux*hl+uy*hl*0.35, p[1]-uy*hl-ux*hl*0.35);
+        ctx.closePath();ctx.fill();
+      }
+      ctx.fillStyle=AXIS_COLORS[i];ctx.font='bold 13px Courier New';
+      ctx.fillText(AXIS_LABELS[i],p[0]+8,p[1]+(i===2?-8:4));
+    });
+
+    for(let t=GRID_STEP;t<AXIS_LEN;t+=GRID_STEP){
+      [[[t,0,0],0],[[0,t,0],1],[[0,0,t],2]].forEach(([pt,i])=>{
+        const p=project(pt);
+        ctx.fillStyle=AXIS_COLORS[i];ctx.globalAlpha=0.4;
+        ctx.beginPath();ctx.arc(p[0],p[1],2,0,Math.PI*2);ctx.fill();
+        ctx.globalAlpha=1;
+      });
+    }
+
+    ctx.fillStyle='#444';ctx.beginPath();ctx.arc(op[0],op[1],3,0,Math.PI*2);ctx.fill();
+
+    const tA=project(vA),tB=project(vB);
+    drawArrow(ctx,op[0],op[1],tA[0],tA[1],COL_A3,3);
+    drawArrow(ctx,op[0],op[1],tB[0],tB[1],COL_B3,3);
+
+    ctx.fillStyle=COL_A3;ctx.globalAlpha=0.25;ctx.beginPath();ctx.arc(tA[0],tA[1],14,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=1;ctx.beginPath();ctx.arc(tA[0],tA[1],6,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=COL_B3;ctx.globalAlpha=0.25;ctx.beginPath();ctx.arc(tB[0],tB[1],14,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=1;ctx.beginPath();ctx.arc(tB[0],tB[1],6,0,Math.PI*2);ctx.fill();
+
+    ctx.font='bold 13px Courier New';
+    ctx.fillStyle=COL_A3;ctx.fillText('A',tA[0]+12,tA[1]-10);
+    ctx.fillStyle=COL_B3;ctx.fillText('B',tB[0]+12,tB[1]-10);
+
+    const c=cosine3(vA,vB),a=angle3(vA,vB)*180/Math.PI;
+    document.getElementById('score5').textContent=c.toFixed(3);
+    document.getElementById('score5').style.color=scoreColor(c);
+    document.getElementById('angle5').textContent='θ = '+a.toFixed(1)+'°';
+  }
+
+  addDrag(canvas,
+    ()=>{const t=project(vA);return [t[0],t[1]];},
+    ()=>{const t=project(vB);return [t[0],t[1]];},
+    (who,mx,my,e)=>{
+      if(who==='bg'){
+        if(lastMouse){
+          azim+=(mx-lastMouse[0])*0.008;
+          elev=Math.max(0.1,Math.min(1.4,elev-(my-lastMouse[1])*0.008));
+        }
+      } else {
+        const nv=unproject(mx,my,who==='a'?vA:vB);
+        if(who==='a')vA=nv;else vB=nv;
+      }
+      lastMouse=[mx,my];
+      draw();
+    },
+    ()=>{lastMouse=null;}
+  );
+  draw();
+})();
+</script>
+</body>
+</html>
