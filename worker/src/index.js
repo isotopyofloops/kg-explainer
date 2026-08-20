@@ -45,7 +45,14 @@ function estimateTokens(text) {
 // --- TEXT RENDERERS ---
 
 function renderProblem() {
-  return `${data.problem}\n\nPrinciple: ${data.principle}`;
+  let body = `${data.problem}\n\nPrinciple: ${data.principle}`;
+  if (data.pull_quote) {
+    body += `\n\n"${data.pull_quote}"`;
+  }
+  if (data.crystallization) {
+    body += `\n\nCrystallization: ${data.crystallization}`;
+  }
+  return body;
 }
 
 function renderComponent(id, comp) {
@@ -77,6 +84,22 @@ function renderComponent(id, comp) {
     for (const [name, info] of Object.entries(comp.allocation)) {
       body += `\n  ${info.percent}% ${name}: ${info.description}`;
     }
+  }
+  if (comp.amplification_hypothesis) {
+    const ah = comp.amplification_hypothesis;
+    body += `\n\nTHE AMPLIFICATION HYPOTHESIS\n\n${ah.claim}\n\n${ah.mechanism}`;
+    if (ah.trigger_questions) {
+      body += "\n\nTrigger questions:";
+      ah.trigger_questions.forEach((q, i) => { body += `\n  ${i + 1}. ${q}`; });
+    }
+    if (ah.methodology_stamps) {
+      body += "\n\nMethodology stamps:";
+      ah.methodology_stamps.forEach((s, i) => { body += `\n  ${i + 1}. ${s}`; });
+    }
+    if (ah.example) body += `\n\n${ah.example}`;
+    if (ah.topology_change) body += `\n\n${ah.topology_change}`;
+    if (ah.why_it_compounds) body += `\n\nWhy it compounds: ${ah.why_it_compounds}`;
+    if (ah.origin) body += `\n\nOrigin: ${ah.origin}`;
   }
   if (comp.examples) {
     for (const ex of comp.examples) {
@@ -111,6 +134,20 @@ function renderTier(tier) {
       for (const [name, info] of Object.entries(c.allocation)) {
         block += `\n        ${info.percent}% ${name}: ${info.description}`;
       }
+    }
+    if (c.amplification_hypothesis) {
+      const ah = c.amplification_hypothesis;
+      block += `\n\n      THE AMPLIFICATION HYPOTHESIS\n\n      ${ah.claim}\n\n      ${ah.mechanism}`;
+      if (ah.trigger_questions) {
+        block += "\n\n      Trigger questions:";
+        ah.trigger_questions.forEach((q, i) => { block += `\n        ${i + 1}. ${q}`; });
+      }
+      if (ah.methodology_stamps) {
+        block += "\n\n      Methodology stamps:";
+        ah.methodology_stamps.forEach((s, i) => { block += `\n        ${i + 1}. ${s}`; });
+      }
+      if (ah.topology_change) block += `\n\n      ${ah.topology_change}`;
+      if (ah.why_it_compounds) block += `\n\n      Why it compounds: ${ah.why_it_compounds}`;
     }
     if (c.examples) {
       for (const ex of c.examples) {
@@ -311,6 +348,7 @@ function componentFullJson(id, comp) {
     ...(comp.sources && { sources: comp.sources }),
     ...(comp.allocation && { allocation: comp.allocation }),
     ...(comp.examples && { examples: comp.examples }),
+    ...(comp.amplification_hypothesis && { amplification_hypothesis: comp.amplification_hypothesis }),
     related: comp.related.map((rid) => ({
       id: rid,
       name: data.components[rid].name,
@@ -374,7 +412,12 @@ export default {
     // --- Problem ---
     if (path === "/problem") {
       const text = renderProblem();
-      return respond(url, text, { problem: data.problem, principle: data.principle });
+      return respond(url, text, {
+        problem: data.problem,
+        principle: data.principle,
+        ...(data.pull_quote && { pull_quote: data.pull_quote }),
+        ...(data.crystallization && { crystallization: data.crystallization }),
+      });
     }
 
     // --- Tiers ---
